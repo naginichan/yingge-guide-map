@@ -167,10 +167,13 @@
 
     window.gm_authFailure = function() {
       initFallbackLeafletMap();
-      showStatus("⚠️ Google Maps 授權受限（若要使用 Google 原生底圖，請在 Google Cloud 金鑰設定加入目前網址或暫時改為「無」），目前已自動切換為免費街道地圖。", "#ffedd5", "#9a3412");
+      showStatus("⚠️ Google Maps 授權受限（請確認 Google Cloud 金鑰設定已儲存且包含網址白名單），目前已自動切換為免費街道地圖。", "#ffedd5", "#9a3412");
     };
 
     function initMapEngine() {
+      // 先立即渲染所有地點卡片，確保畫面秒開不空白
+      renderAll();
+
       const params = new URLSearchParams({
         key: GOOGLE_API_KEY,
         language: "zh-TW",
@@ -292,21 +295,37 @@
         const card = document.createElement('div');
         card.className = 'card';
         card.id = 'card-' + p.id;
-        card.innerHTML =
-          '<div>' +
-            '<div class="badges-row">' +
-              '<span class="badge ' + p.category + '">' + p.catLabel + '</span>' +
-              wcTag +
-            '</div>' +
-            '<h3>' + p.name + '</h3>' +
-            '<div class="meta">' + p.meta + '</div>' +
-            '<div class="rating">⭐ ' + p.rating + ' <span>(' + p.count.toLocaleString() + ' 則 Google 評論)</span></div>' +
-            '<div class="review-box">💬 「' + p.review + '」</div>' +
+
+        const topDiv = document.createElement('div');
+        topDiv.innerHTML =
+          '<div class="badges-row">' +
+            '<span class="badge ' + p.category + '">' + p.catLabel + '</span>' +
+            wcTag +
           '</div>' +
-          '<div class="actions">' +
-            '<button class="btn-locate" onclick="focusPlace('' + p.id + '')">📍 地圖定位</button>' +
-            '<a class="btn-gmap" href="' + gmapUrl + '" target="_blank">🗺️ Google 導航</a>' +
-          '</div>';
+          '<h3>' + p.name + '</h3>' +
+          '<div class="meta">' + p.meta + '</div>' +
+          '<div class="rating">⭐ ' + p.rating + ' <span>(' + p.count.toLocaleString() + ' 則 Google 評論)</span></div>' +
+          '<div class="review-box">💬 「' + p.review + '」</div>';
+
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'actions';
+
+        const locateBtn = document.createElement('button');
+        locateBtn.className = 'btn-locate';
+        locateBtn.textContent = '📍 地圖定位';
+        locateBtn.addEventListener('click', () => focusPlace(p.id));
+
+        const gmapLink = document.createElement('a');
+        gmapLink.className = 'btn-gmap';
+        gmapLink.href = gmapUrl;
+        gmapLink.target = '_blank';
+        gmapLink.textContent = '🗺️ Google 導航';
+
+        actionsDiv.appendChild(locateBtn);
+        actionsDiv.appendChild(gmapLink);
+
+        card.appendChild(topDiv);
+        card.appendChild(actionsDiv);
         grid.appendChild(card);
       });
     }
@@ -333,7 +352,7 @@
     }
 
     async function syncGooglePlaces(forceRefresh = false) {
-      const cacheKey = "yingge_places_zh_tw_full_v4";
+      const cacheKey = "yingge_places_zh_tw_full_v5";
       const cached = localStorage.getItem(cacheKey);
       if (!forceRefresh && cached) {
         const parsed = JSON.parse(cached);
@@ -392,7 +411,7 @@
         renderAll();
         showStatus("✅ 同步完成！已從 Google Places API 更新 " + successCount + " 個地點的最新星等、座標與旅客評論。", "#dcfce7", "#166534");
       } else {
-        showStatus("⚠️ 無法從 Google API 取得資料：若金鑰有設定「網站（HTTP 參照網址）」白名單，請確認已包含目前開啟網頁的網址（或暫時改為「無」測試）。", "#fee2e2", "#991b1b");
+        showStatus("⚠️ 無法從 Google API 取得資料：請確認 Google Cloud 金鑰設定已儲存且包含 https://naginichan.github.io/*", "#fee2e2", "#991b1b");
       }
     }
 
