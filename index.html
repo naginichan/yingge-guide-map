@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>鶯歌陶瓷老街＆博物館 互動式導覽地圖</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --primary: #b45309;
+      --primary-dark: #92400e;
+      --bg: #fafaf9;
+      --card: #ffffff;
+      --text: #1c1917;
+      --muted: #57534e;
+      --border: #e7e5e4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+    header { background: linear-gradient(135deg, #78350f, #b45309); color: #fff; padding: 16px 20px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+    header h1 { font-size: 1.25rem; letter-spacing: 0.5px; }
+    header p { font-size: 0.85rem; opacity: 0.92; margin-top: 2px; }
+    .btn-sync { background: #fff; color: var(--primary-dark); border: none; padding: 9px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.88rem; box-shadow: 0 2px 4px rgba(0,0,0,0.12); transition: 0.2s; }
+    .btn-sync:hover { background: #fef3c7; }
+    .btn-sync:disabled { opacity: 0.65; cursor: not-allowed; }
+    #status-bar { background: #fef3c7; color: #92400e; padding: 10px 20px; font-size: 0.86rem; border-bottom: 1px solid #fde68a; font-weight: 500; }
+    .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 20px; background: #fff; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1000; }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; }
+    .filter-btn { border: 1px solid var(--border); background: #fff; padding: 6px 13px; border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--text); transition: 0.15s; }
+    .filter-btn:hover { background: #f5f5f4; }
+    .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .search-input { padding: 7px 12px; border: 1px solid var(--border); border-radius: 20px; font-size: 0.85rem; min-width: 220px; outline: none; }
+    .search-input:focus { border-color: var(--primary); }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 8px 20px; background: #f5f5f4; font-size: 0.8rem; color: var(--muted); border-bottom: 1px solid var(--border); }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; border: 1.5px solid #fff; box-shadow: 0 0 2px rgba(0,0,0,0.3); }
+    #map { height: 48vh; min-height: 340px; width: 100%; border-bottom: 2px solid var(--border); }
+    .container { max-width: 1160px; margin: 0 auto; padding: 20px; }
+    .count-info { font-size: 0.88rem; color: var(--muted); margin-bottom: 12px; font-weight: 500; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 16px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: 0.2s; }
+    .card.highlight { border: 2px solid var(--primary); background: #fffbeb; transform: translateY(-2px); }
+    .badges-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .badge { display: inline-block; font-size: 0.75rem; padding: 3px 9px; border-radius: 6px; font-weight: 700; }
+    .badge.spot { background: #dbeafe; color: #1e40af; }
+    .badge.food { background: #ffedd5; color: #9a3412; }
+    .badge.toilet { background: #dcfce7; color: #166534; }
+    .badge.shop-toilet { background: #f3e8ff; color: #6b21a8; }
+    .badge.has-wc { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+    .card h3 { font-size: 1.06rem; margin-bottom: 4px; color: var(--text); }
+    .meta { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+    .rating { font-size: 0.88rem; color: #d97706; font-weight: 700; margin-bottom: 8px; }
+    .rating span { color: var(--muted); font-weight: 400; }
+    .review-box { background: #f5f5f4; padding: 9px 11px; border-radius: 8px; font-size: 0.84rem; color: #44403c; margin-bottom: 12px; }
+    .actions { display: flex; gap: 8px; margin-top: auto; }
+    .actions button, .actions a { flex: 1; text-align: center; padding: 8px 10px; border-radius: 8px; font-size: 0.84rem; text-decoration: none; font-weight: 600; cursor: pointer; }
+    .btn-locate { background: #f5f5f4; color: var(--text); border: 1px solid var(--border); }
+    .btn-locate:hover { background: #e7e5e4; }
+    .btn-gmap { background: var(--primary); color: #fff; border: none; }
+    .btn-gmap:hover { background: var(--primary-dark); }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>🏺 鶯歌陶瓷老街＆博物館 互動式導覽地圖</h1>
+      <p>完整收錄 30 處必逛景點、老街美食、公共廁所與商店友善廁所・支援 Google 即時評論同步</p>
+    </div>
+    <button id="syncBtn" class="btn-sync" onclick="syncGooglePlaces(true)">🔄 同步最新 Google 評論</button>
+  </header>
+
+  <div id="status-bar">⏳ 正在載入互動地圖與鶯歌精選地點資料...</div>
+
+  <div class="toolbar">
+    <div class="filters">
+      <button class="filter-btn active" onclick="setCategory('all', this)">全部地點</button>
+      <button class="filter-btn" onclick="setCategory('spot', this)">🏛️ 景點逛街</button>
+      <button class="filter-btn" onclick="setCategory('food', this)">🍜 美食小吃</button>
+      <button class="filter-btn" onclick="setCategory('toilet', this)">🚻 公共廁所</button>
+      <button class="filter-btn" onclick="setCategory('shop-toilet', this)">🏪 有廁所的店家</button>
+    </div>
+    <input type="text" id="searchInput" class="search-input" placeholder="🔍 搜尋店名、小吃、價位或廁所..." oninput="renderAll()" />
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="dot" style="background:#2563eb"></span> 景點逛街</div>
+    <div class="legend-item"><span class="dot" style="background:#ea580c"></span> 美食小吃</div>
+    <div class="legend-item"><span class="dot" style="background:#16a34a"></span> 公共廁所</div>
+    <div class="legend-item"><span class="dot" style="background:#9333ea"></span> 有廁所的店家／場館</div>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="container">
+    <div id="countInfo" class="count-info"></div>
+    <div id="cardsGrid" class="grid"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const GOOGLE_API_KEY = "AIzaSyARDsJCLgSHbsT5-QueoK0N6sFl3VgHQs4";
+
+    let placesData = [
+      // ================= 🏛️ 景點逛街 =================
+      { id: "museum", name: "新北市立鶯歌陶瓷博物館", category: "spot", catLabel: "🏛️ 景點逛街", meta: "博物館・冷氣開放", hasToilet: true, lat: 24.9493, lng: 121.3519, rating: 4.5, count: 16800, review: "館藏豐富且清水模建築採光極佳，室內冷氣舒適且各樓層皆有乾淨洗手間，最適合當作鶯歌第一站。" },
+      { id: "oldstreet", name: "鶯歌陶瓷老街", category: "spot", catLabel: "🏛️ 景點逛街", meta: "旅遊景點", hasToilet: false, lat: 24.9532, lng: 121.3489, rating: 4.2, count: 27133, review: "街道規劃好逛有特色，各式生活餐盤、茶具與手拉坯體驗選擇非常豐富。" },
+      { id: "taoguan", name: "鶯歌老街陶館", category: "spot", catLabel: "🏛️ 景點逛街", meta: "旅遊景點", hasToilet: false, lat: 24.9525, lng: 121.3496, rating: 4.1, count: 9815, review: "紅磚煙囪與復古建築很好拍照，館內集結許多特色陶瓷小店與文創商品。" },
+      { id: "guangdian", name: "鶯歌光點美學館", category: "spot", catLabel: "🏛️ 景點逛街", meta: "百貨公司・文創商場", hasToilet: true, lat: 24.9522, lng: 121.3491, rating: 4.3, count: 2004, review: "老街中心最寬敞的文創百貨商場，室內冷氣涼爽且設有乾淨友善的公共洗手間。" },
+      { id: "guangdian_art", name: "光點藝術中心", category: "spot", catLabel: "🏛️ 景點逛街", meta: "藝術博物館", hasToilet: true, lat: 24.9523, lng: 121.3492, rating: 4.2, count: 194, review: "位於光點美學館內，定期舉辦精緻陶瓷與當代藝術特展，免費參觀質感極佳。" },
+
+      // ================= 🍜 美食小吃 =================
+      { id: "houdao", name: "厚道飲食店", category: "food", catLabel: "🍜 美食小吃", meta: "$1-200・台灣菜", hasToilet: false, lat: 24.9536, lng: 121.3486, rating: 4.1, count: 4894, review: "古早味排骨飯外酥內嫩、份量十足，懷舊復古裝潢非常有氣氛。" },
+      { id: "huangcheng", name: "皇城善良", category: "food", catLabel: "🍜 美食小吃", meta: "$200-400・咖啡店", hasToilet: false, lat: 24.9531, lng: 121.3491, rating: 4.6, count: 5, review: "老街裡的質感咖啡小店，環境溫馨放鬆，適合逛累了進來喝杯咖啡休息。" },
+      { id: "ama_douhua", name: "阿嬤ㄟ豆花", category: "food", catLabel: "🍜 美食小吃", meta: "甜品店", hasToilet: false, lat: 24.9539, lng: 121.3495, rating: 4.0, count: 1128, review: "傳統古早味手工豆花綿密滑順，配料豐富、糖水清甜消暑。" },
+      { id: "jiuzhi", name: "九指快手包子店", category: "food", catLabel: "🍜 美食小吃", meta: "$1-200・中式包點", hasToilet: false, lat: 24.9540, lng: 121.3498, rating: 4.1, count: 1220, review: "老街排隊人氣包子店，外皮蓬鬆 Q 彈、肉餡飽滿多汁，買顆邊走邊吃剛剛好。" },
+      { id: "mutton_oyster", name: "鶯歌羊肉羹蚵仔煎", category: "food", catLabel: "🍜 美食小吃", meta: "$1-200・熟食店", hasToilet: false, lat: 24.9533, lng: 121.3488, rating: 4.1, count: 356, review: "在地經典小吃組合，蚵仔煎外皮微酥醬汁順口，搭配沙茶羊肉羹很滿足。" },
+      { id: "apo", name: "阿婆壽司", category: "food", catLabel: "🍜 美食小吃", meta: "$1-200・壽司", hasToilet: false, lat: 24.9554, lng: 121.3517, rating: 4.1, count: 22707, review: "鶯歌超高人氣平價經典美食，綜合壽司搭配茶碗蒸與關東煮 CP 值極高。" },
+      { id: "yilan_bao", name: "鶯歌宜蘭土包仔", category: "food", catLabel: "🍜 美食小吃", meta: "$1-200・中式包點店", hasToilet: false, lat: 24.9552, lng: 121.3515, rating: 4.1, count: 2337, review: "價格親民的排隊老店，竹筍包、芋泥包與肉包皮薄餡多，常有人整袋外帶。" },
+      { id: "mcd", name: "麥當勞-鶯歌文化餐廳", category: "food", catLabel: "🍜 美食小吃", meta: "$200-400・快餐", hasToilet: true, lat: 24.9543, lng: 121.3538, rating: 3.7, count: 1593, review: "位於火車站往老街與陶博館動線上，內用座位多且設有洗手間，吹冷氣休憩很方便。" },
+      { id: "jiaxin", name: "佳欣越南法國麵包", category: "food", catLabel: "🍜 美食小吃", meta: "$1-200・越南菜", hasToilet: false, lat: 24.9547, lng: 121.3510, rating: 4.8, count: 74, review: "現烤法國麵包外酥內軟，夾入滿滿燒肉、肝醬與爽脆醃蘿蔔，清爽又開胃。" },
+      { id: "youkedao", name: "有客到手工肉圓&蚵仔+小腸麵線", category: "food", catLabel: "🍜 美食小吃", meta: "$1-200・熟食店", hasToilet: false, lat: 24.9549, lng: 121.3513, rating: 4.3, count: 74, review: "手工肉圓外皮 Q 彈有嚼勁，搭配料多實在的大腸蚵仔麵線，道地台灣味。" },
+      { id: "xinsanmei", name: "新三美傳統甜品", category: "food", catLabel: "🍜 美食小吃", meta: "甜品店", hasToilet: false, lat: 24.9544, lng: 121.3506, rating: 4.7, count: 327, review: "評分超高的傳統甜品店，豆花、仙草與挫冰配料用心熬煮，甜而不膩。" },
+      { id: "sausage", name: "陶瓷老街烤香腸", category: "food", catLabel: "🍜 美食小吃", meta: "小吃攤", hasToilet: false, lat: 24.9528, lng: 121.3493, rating: 5.0, count: 2, review: "炭火現烤香腸香氣四溢、肥瘦適中，逛老街時來一支配蒜頭超過癮。" },
+      { id: "peanut_ice", name: "麥光花生捲冰淇淋（阿宗芋冰城）", category: "food", catLabel: "🍜 美食小吃", meta: "$1-200・中菜館／甜點", hasToilet: false, lat: 24.9530, lng: 121.3490, rating: 4.5, count: 74, review: "現刨花生磚糖粉搭配香濃傳統芋頭冰與香菜，潤餅皮包起來口感層次豐富。" },
+      { id: "xiaowuji", name: "蕭伍吉彩色地瓜球（鶯歌老街店）", category: "food", catLabel: "🍜 美食小吃", meta: "$1-200・小食/零食吧", hasToilet: false, lat: 24.9529, lng: 121.3492, rating: 3.8, count: 5, review: "色彩繽紛的現炸地瓜球，外酥內空心有嚼勁，是逛老街人氣散步點心。" },
+      { id: "mianmian", name: "綿綿古早味", category: "food", catLabel: "🍜 美食小吃", meta: "$1-200・餐廳", hasToilet: false, lat: 24.9535, lng: 121.3487, rating: 4.8, count: 276, review: "高評價古早味料理與冰品，用料實在、口味親切，深受在地人與遊客喜愛。" },
+      { id: "starbucks", name: "Starbucks星巴克 鶯歌門市", category: "food", catLabel: "🍜 美食小吃", meta: "$200-400・咖啡店", hasToilet: true, lat: 24.9538, lng: 121.3484, rating: 4.4, count: 1891, review: "結合紅磚建築與在地陶瓷工藝的特色門市，空間寬敞舒適且店內設有洗手間。" },
+      { id: "wengzai", name: "鶯歌甕仔麵", category: "food", catLabel: "🍜 美食小吃", meta: "$200-400・餐廳", hasToilet: false, lat: 24.9529, lng: 121.3492, rating: 4.1, count: 1430, review: "以鶯歌特色陶甕盛裝熱騰騰湯麵，保溫效果好、湯頭清甜順口。" },
+      { id: "soleil", name: "Soleil croissant可頌咖啡廳 鶯歌老街店", category: "food", catLabel: "🍜 美食小吃", meta: "$1-200・咖啡店", hasToilet: false, lat: 24.9534, lng: 121.3487, rating: 4.9, count: 57, review: "老街裡的高顏值可頌咖啡廳，可頌外皮酥脆奶香濃郁，搭配手沖咖啡超享受。" },
+      { id: "lelexuan", name: "樂樂軒·元祖中華拉麵", category: "food", catLabel: "🍜 美食小吃", meta: "$1-200・日本菜", hasToilet: false, lat: 24.9537, lng: 121.3485, rating: 4.4, count: 169, review: "日式昭和風格拉麵店，湯頭濃郁順口、叉燒軟嫩，是老街周邊高人氣正餐選擇。" },
+      { id: "esuwa", name: "ESUWA 肉桂卷&可頌專売處", category: "food", catLabel: "🍜 美食小吃", meta: "甜品店", hasToilet: false, lat: 24.9530, lng: 121.3490, rating: 4.5, count: 1878, review: "老街超人氣排隊甜點，肉桂捲香氣濃郁、可頌口味多樣，當伴手禮也很適合。" },
+      { id: "xianglu", name: "巷鹿甜冰品", category: "food", catLabel: "🍜 美食小吃", meta: "$1-200・冰品飲料店", hasToilet: false, lat: 24.9526, lng: 121.3494, rating: 4.6, count: 229, review: "文青風格冰品飲料店，刨冰與手作甜湯精緻爽口，逛街歇腳好去處。" },
+
+      // ================= 🚻 公共廁所 =================
+      { id: "toilet_1", name: "公共廁所（重慶街公三公園旁）", category: "toilet", catLabel: "🚻 公共廁所", meta: "公廁・全天開放", hasToilet: true, lat: 24.9519, lng: 121.3499, rating: 3.8, count: 5, review: "距離陶瓷老街主幹道步行僅需 2 分鐘，無需消費即可直接使用。" },
+      { id: "toilet_2", name: "公共廁所（鶯歌老街周邊）", category: "toilet", catLabel: "🚻 公共廁所", meta: "公廁", hasToilet: true, lat: 24.9515, lng: 121.3504, rating: 1.0, count: 1, review: "老街外圍公共廁所，建議優先選擇光點美學館或公三公園旁公廁環境較佳。" },
+
+      // ================= 🏪 有廁所的店家／場館 =================
+      { id: "wc_guangdian", name: "鶯歌光點美學館（館內洗手間）", category: "shop-toilet", catLabel: "🏪 有廁所的店家", meta: "百貨商場內廁所・冷氣開放", hasToilet: true, lat: 24.9522, lng: 121.3491, rating: 4.3, count: 2004, review: "老街逛街首選洗手間！位於光點美學館內，空間明亮乾淨且有專人定期清潔維護。" },
+      { id: "wc_tongqing", name: "鶯歌區同慶市民活動中心（館內洗手間）", category: "shop-toilet", catLabel: "🏪 有廁所的店家", meta: "社區中心內廁所", hasToilet: true, lat: 24.9537, lng: 121.3499, rating: 4.1, count: 27, review: "位於老街北側同慶里一帶，開放時間內可就近借用乾淨洗手間。" },
+      { id: "wc_starbucks", name: "Starbucks星巴克 鶯歌門市（店內洗手間）", category: "shop-toilet", catLabel: "🏪 有廁所的店家", meta: "咖啡店內廁所", hasToilet: true, lat: 24.9538, lng: 121.3484, rating: 4.4, count: 1891, review: "老街入口旁紅磚特色星巴克，點杯飲料休息時可方便使用店內洗手間。" },
+      { id: "wc_mcd", name: "麥當勞-鶯歌文化餐廳（店內洗手間）", category: "shop-toilet", catLabel: "🏪 有廁所的店家", meta: "快餐店內廁所", hasToilet: true, lat: 24.9543, lng: 121.3538, rating: 3.7, count: 1593, review: "火車站步行往老街必經路上，點餐或休憩時使用店內廁所非常方便。" },
+      { id: "wc_museum", name: "新北市立鶯歌陶瓷博物館（館內洗手間）", category: "shop-toilet", catLabel: "🏪 有廁所的店家", meta: "博物館內廁所", hasToilet: true, lat: 24.9493, lng: 121.3519, rating: 4.5, count: 16800, review: "陶博館各樓層及戶外園區皆設有寬敞整潔的無障礙與親子洗手間。" }
+    ];
+
+    let currentCategory = 'all';
+    let useGoogleMap = false;
+    let gMap = null;
+    let gMarkers = {};
+    let gInfoWindow = null;
+    let lMap = null;
+    let lMarkers = {};
+
+    function getCategoryColor(cat) {
+      if (cat === 'spot') return '#2563eb';
+      if (cat === 'food') return '#ea580c';
+      if (cat === 'toilet') return '#16a34a';
+      return '#9333ea';
+    }
+
+    function showStatus(msg, bg = '#fef3c7', color = '#92400e') {
+      const bar = document.getElementById('status-bar');
+      bar.style.background = bg;
+      bar.style.color = color;
+      bar.textContent = msg;
+    }
+
+    window.gm_authFailure = function() {
+      initFallbackLeafletMap();
+      showStatus("⚠️ Google Maps 授權受限（若要使用 Google 原生底圖，請在 Google Cloud 金鑰設定加入目前網址或暫時改為「無」），目前已自動切換為免費街道地圖。", "#ffedd5", "#9a3412");
+    };
+
+    function initMapEngine() {
+      const params = new URLSearchParams({
+        key: GOOGLE_API_KEY,
+        language: "zh-TW",
+        region: "TW",
+        callback: "onGoogleMapsLoaded"
+      });
+      const script = document.createElement('script');
+      script.src = "https://maps.googleapis.com/maps/api/js?" + params.toString();
+      script.async = true;
+      script.onerror = function() {
+        initFallbackLeafletMap();
+      };
+      document.head.appendChild(script);
+    }
+
+    window.onGoogleMapsLoaded = function() {
+      useGoogleMap = true;
+      gMap = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: 24.9530, lng: 121.3502 },
+        zoom: 16,
+        mapTypeControl: false,
+        streetViewControl: false
+      });
+      gInfoWindow = new google.maps.InfoWindow();
+      renderAll();
+      showStatus("✅ Google Maps 原生街道地圖已載入！點擊右上角「🔄 同步最新 Google 評論」即可抓取即時星等與評論。", "#dcfce7", "#166534");
+    };
+
+    function initFallbackLeafletMap() {
+      useGoogleMap = false;
+      if (lMap) { lMap.invalidateSize(); return; }
+      lMap = L.map('map').setView([24.9530, 121.3502], 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap 貢獻者'
+      }).addTo(lMap);
+      renderAll();
+    }
+
+    function setCategory(cat, btn) {
+      currentCategory = cat;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderAll();
+    }
+
+    function renderAll() {
+      const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+      const grid = document.getElementById('cardsGrid');
+      grid.innerHTML = '';
+
+      if (useGoogleMap) {
+        Object.values(gMarkers).forEach(m => m.setMap(null));
+        gMarkers = {};
+      } else if (lMap) {
+        Object.values(lMarkers).forEach(m => lMap.removeLayer(m));
+        lMarkers = {};
+      }
+
+      const filtered = placesData.filter(p => {
+        const matchCat = currentCategory === 'all' || p.category === currentCategory;
+        const matchKey = !keyword ||
+          p.name.toLowerCase().includes(keyword) ||
+          p.meta.toLowerCase().includes(keyword) ||
+          p.review.toLowerCase().includes(keyword) ||
+          p.catLabel.includes(keyword) ||
+          (keyword.includes('廁') && p.hasToilet);
+        return matchCat && matchKey;
+      });
+
+      document.getElementById('countInfo').textContent = "目前顯示 " + filtered.length + " 個地點（點擊地圖圖釘或卡片「地圖定位」可查看詳細位置）";
+
+      filtered.forEach(p => {
+        const gmapUrl = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(p.name + " 新北市鶯歌區");
+        const color = getCategoryColor(p.category);
+        const wcTag = p.hasToilet ? '<span class="badge has-wc">🚻 內設洗手間</span>' : '';
+        const popupHtml = '<div style="font-family:sans-serif;max-width:240px;line-height:1.45;">' +
+          '<div style="font-size:12px;color:' + color + ';font-weight:700;">' + p.catLabel + (p.hasToilet ? ' ・ 🚻 有廁所' : '') + '</div>' +
+          '<div style="font-size:15px;font-weight:700;margin:2px 0;">' + p.name + '</div>' +
+          '<div style="font-size:12px;color:#57534e;margin-bottom:2px;">' + p.meta + '</div>' +
+          '<div style="font-size:13px;color:#d97706;font-weight:700;">⭐ ' + p.rating + ' <span style="color:#666;font-weight:400;">(' + p.count.toLocaleString() + ' 則評論)</span></div>' +
+          '<div style="font-size:12px;color:#444;margin:6px 0;">「' + p.review + '」</div>' +
+          '<a href="' + gmapUrl + '" target="_blank" style="display:inline-block;margin-top:4px;color:#b45309;font-weight:700;text-decoration:none;">🗺️ 開啟 Google 地圖導航 →</a>' +
+          '</div>';
+
+        if (useGoogleMap && gMap) {
+          const marker = new google.maps.Marker({
+            position: { lat: p.lat, lng: p.lng },
+            map: gMap,
+            title: p.name,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 9,
+              fillColor: color,
+              fillOpacity: 0.95,
+              strokeColor: '#ffffff',
+              strokeWeight: 2
+            }
+          });
+          marker.addListener('click', () => {
+            gInfoWindow.setContent(popupHtml);
+            gInfoWindow.open(gMap, marker);
+            highlightCard(p.id);
+          });
+          gMarkers[p.id] = marker;
+        } else if (lMap) {
+          const marker = L.circleMarker([p.lat, p.lng], {
+            radius: 9,
+            fillColor: color,
+            color: '#fff',
+            weight: 2,
+            fillOpacity: 0.95
+          }).addTo(lMap);
+          marker.bindPopup(popupHtml);
+          marker.on('click', () => highlightCard(p.id));
+          lMarkers[p.id] = marker;
+        }
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.id = 'card-' + p.id;
+        card.innerHTML =
+          '<div>' +
+            '<div class="badges-row">' +
+              '<span class="badge ' + p.category + '">' + p.catLabel + '</span>' +
+              wcTag +
+            '</div>' +
+            '<h3>' + p.name + '</h3>' +
+            '<div class="meta">' + p.meta + '</div>' +
+            '<div class="rating">⭐ ' + p.rating + ' <span>(' + p.count.toLocaleString() + ' 則 Google 評論)</span></div>' +
+            '<div class="review-box">💬 「' + p.review + '」</div>' +
+          '</div>' +
+          '<div class="actions">' +
+            '<button class="btn-locate" onclick="focusPlace('' + p.id + '')">📍 地圖定位</button>' +
+            '<a class="btn-gmap" href="' + gmapUrl + '" target="_blank">🗺️ Google 導航</a>' +
+          '</div>';
+        grid.appendChild(card);
+      });
+    }
+
+    function focusPlace(id) {
+      const p = placesData.find(item => item.id === id);
+      if (!p) return;
+      highlightCard(id);
+      if (useGoogleMap && gMap && gMarkers[id]) {
+        gMap.panTo({ lat: p.lat, lng: p.lng });
+        gMap.setZoom(17);
+        google.maps.event.trigger(gMarkers[id], 'click');
+      } else if (lMap && lMarkers[id]) {
+        lMap.flyTo([p.lat, p.lng], 17);
+        lMarkers[id].openPopup();
+      }
+      document.getElementById('map').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function highlightCard(id) {
+      document.querySelectorAll('.card').forEach(c => c.classList.remove('highlight'));
+      const el = document.getElementById('card-' + id);
+      if (el) el.classList.add('highlight');
+    }
+
+    async function syncGooglePlaces(forceRefresh = false) {
+      const cacheKey = "yingge_places_zh_tw_full_v4";
+      const cached = localStorage.getItem(cacheKey);
+      if (!forceRefresh && cached) {
+        const parsed = JSON.parse(cached);
+        if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+          placesData = parsed.data;
+          renderAll();
+          showStatus("✅ 已載入 24 小時內的 Google Places API 快取資料（節省 API 免費額度）。", "#dcfce7", "#166534");
+          return;
+        }
+      }
+
+      const btn = document.getElementById('syncBtn');
+      btn.disabled = true;
+      showStatus("⏳ 正在連線 Google Places API (New) 同步最新星等、評論數與旅客評論...");
+
+      let successCount = 0;
+      for (let item of placesData) {
+        if (item.category === 'toilet') continue;
+        const cleanQueryName = item.name.replace(/（.*?）/g, '');
+        try {
+          const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": GOOGLE_API_KEY,
+              "X-Goog-FieldMask": "places.displayName,places.rating,places.userRatingCount,places.reviews,places.location"
+            },
+            body: JSON.stringify({
+              textQuery: cleanQueryName + " 新北市鶯歌區",
+              languageCode: "zh-TW",
+              maxResultCount: 1
+            })
+          });
+          const json = await res.json();
+          const place = json.places && json.places[0];
+          if (place) {
+            successCount++;
+            if (place.rating) item.rating = place.rating;
+            if (place.userRatingCount) item.count = place.userRatingCount;
+            if (place.location) {
+              item.lat = place.location.latitude;
+              item.lng = place.location.longitude;
+            }
+            if (place.reviews && place.reviews[0] && place.reviews[0].text && place.reviews[0].text.text) {
+              item.review = place.reviews[0].text.text;
+            }
+          }
+        } catch (err) {
+          console.error("同步失敗:", item.name, err);
+        }
+      }
+
+      btn.disabled = false;
+      if (successCount > 0) {
+        localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), data: placesData }));
+        renderAll();
+        showStatus("✅ 同步完成！已從 Google Places API 更新 " + successCount + " 個地點的最新星等、座標與旅客評論。", "#dcfce7", "#166534");
+      } else {
+        showStatus("⚠️ 無法從 Google API 取得資料：若金鑰有設定「網站（HTTP 參照網址）」白名單，請確認已包含目前開啟網頁的網址（或暫時改為「無」測試）。", "#fee2e2", "#991b1b");
+      }
+    }
+
+    initMapEngine();
+  </script>
+</body>
+</html>
